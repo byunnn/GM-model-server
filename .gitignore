@@ -3,3 +3,4 @@
 ckpt/discriminator.pth
 ckpt/generator.pth
 *.csv
+gmModel/expr/checkpoints/x-raymed/*.ckpt
