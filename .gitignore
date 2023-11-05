@@ -1,0 +1,5 @@
+
+.env
+ckpt/discriminator.pth
+ckpt/generator.pth
+*.csv
