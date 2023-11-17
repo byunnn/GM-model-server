@@ -1,6 +1,10 @@
-
 .env
 ckpt/discriminator.pth
 ckpt/generator.pth
 *.csv
 gmModel/expr/checkpoints/x-raymed/*.ckpt
+gmModel_DC/data/COVID/*.png
+gmModel_DC/data/Normal/*.png
+gmModel_DC/generated_images/*.png
+GM-model-server/images/*.png
+generated_images/*.png

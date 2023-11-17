@@ -3,7 +3,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as dset
 
 # Directory containing the data.
-root = 'data'
+root = 'gmModel_DC/data'
 
 def get_data(params):
     """
