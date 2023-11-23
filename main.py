@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File
 import os
+from starlette.config import Config
 import requests
 from zipfile import ZipFile
 from pydantic import BaseModel
@@ -13,9 +14,12 @@ from generate_gm import generate_main
 
 app = FastAPI()
 
-# server_ip = os.environ["SERVER_API_URL"]
-# server_ip = "http://172.20.10.9:8001/"
-server_ip = "http://172.20.10.9:8001/"
+# SERVER_IP = "http://192.168.177.110:8001/"
+
+config = Config(".env")
+SERVER_IP = config('API_BASE_URL')
+
+
 
 @app.get("/")
 async def root():
@@ -65,20 +69,18 @@ async def download_and_extract(item: File):
     with ZipFile(file_path, "r") as zip_ref:
         zip_ref.extractall(target_dir)
 
-    train_dcgan(projectName)
-    generate_images(projectName, email)
+    await train_dcgan(projectName)
+    await generate_images(projectName, email)
 
 
 #이미지 생성 + zip 파일로 압축
-def generate_images(projectName, email):
+async def generate_images(projectName, email):
     try:
-        
-        generate_dcgan(projectName)
+        await generate_dcgan(projectName)
 
         output_dir = 'gmModel_DC/outputs/'+projectName
         zip_file_path = os.path.join(output_dir, projectName+'.zip')
         # zip_file_path = output_dir+projectName+'.zip'
-
         # zip_filename = projectName+'.zip'
         # zip_filename = "generated_images.zip"
 
@@ -88,7 +90,8 @@ def generate_images(projectName, email):
                 for file in files:
                     file_path = os.path.join(root, file)
                     zipf.write(file_path, os.path.relpath(file_path, output_dir))
-        send_zip_fun(projectName, email)
+
+        await send_zip_fun(projectName, email)
         
 
     except Exception as e:
@@ -116,13 +119,13 @@ def generate_images(projectName, email):
 
 
 #loss, generated_gif
-def send_zip_fun(projectName, email):
+async def send_zip_fun(projectName, email):
     output_dir = 'gmModel_DC/outputs/'+projectName + '/'
     zip_file_path = output_dir + projectName + '.zip'
     loss_fig_path = output_dir+ 'fig/Training_loss.png'
     gif_path = output_dir+ 'gif/X_ray.gif'
     generated_single_img_path = output_dir + 'generated_single_image.png'
-    endpoint = server_ip + "zips"
+    endpoint = SERVER_IP + "zips"
 
     data = {
         #원본, 생성
@@ -152,18 +155,18 @@ def send_zip_fun(projectName, email):
     
 
     
-def sample_demo(email : str, projectName : str):
-    train_dcgan(projectName)
-    generate_dcgan(projectName)
-    output_dir = 'gmModel_DC/outputs/'+projectName
+# def sample_demo(email : str, projectName : str):
+#     train_dcgan(projectName)
+#     generate_dcgan(projectName)
+#     output_dir = 'gmModel_DC/outputs/'+projectName
 
-    zip_file_path = output_dir+projectName+'.zip'
+#     zip_file_path = output_dir+projectName+'.zip'
 
 
 
-if __name__ == '__main__':
-    generate_images(email="test@naver.com", projectName="project2")
-    # sample_demo(email="byun-@naver.com", projectName="project1")
+# if __name__ == '__main__':
+#     generate_images(email="test@naver.com", projectName="project2")
+#     # sample_demo(email="byun-@naver.com", projectName="project1")
 
 
 

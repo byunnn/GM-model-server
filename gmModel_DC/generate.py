@@ -11,7 +11,7 @@ import random
 from gmModel_DC.dcgan import Generator
 
 
-def generate_dcgan(projectName):
+async def generate_dcgan(projectName):
     device = torch.device("cuda:0" if(torch.cuda.is_available()) else "cpu")
 
     output_dir = 'gmModel_DC/outputs/'+ projectName+'/generated_images'

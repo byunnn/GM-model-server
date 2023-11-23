@@ -10,6 +10,7 @@ import os
 import websockets
 import asyncio
 import datetime
+from starlette.config import Config
 from gmModel_DC.utils import get_data 
 from gmModel_DC.dcgan import weights_init, Generator, Discriminator 
 
@@ -34,7 +35,7 @@ async def train_dcgan(projectName) :
         'nz': 100,
         'ngf': 64,
         'ndf': 64,
-        'nepochs': 2,
+        'nepochs': 1,
         'lr': 0.0002,
         'beta1': 0.5,
         'save_epoch': 10
@@ -46,12 +47,14 @@ async def train_dcgan(projectName) :
     dataloader = get_data(params)
 
     sample_batch = next(iter(dataloader))
-    plt.figure(figsize=(8, 8))
-    plt.axis("off")
-    plt.title("Training Images")
-    plt.imshow(np.transpose(vutils.make_grid(
-        sample_batch[0].to(device)[:64], padding=2, normalize=True).cpu(), (1, 2, 0)))
-    plt.show()
+    # plt.figure(figsize=(8, 8))
+    # plt.axis("off")
+    # plt.title("Training Images")
+    # plt.imshow(np.transpose(vutils.make_grid(
+    #     sample_batch[0].to(device)[:64], padding=2, normalize=True).cpu(), (1, 2, 0)))
+    # plt.show()
+
+    
 
     netG = Generator(params).to(device)
     netG.apply(weights_init)
@@ -79,65 +82,77 @@ async def train_dcgan(projectName) :
 
     print("Starting Training Loop...")
 
-    for epoch in range(params['nepochs']):
-        # asyncio.create_task(submitForm(params['nepochs'], epoch))
+    config = Config(".env")
+    SERVER_IP = config('API_BASE_URL')
+    WEBSOCKET_API_URL = f"ws://{SERVER_IP}/webSocketHandler"
 
-        await submitForm(epoch) 
-        for i, data in enumerate(dataloader, 0):
-                       
-            # asyncio.ensure_future(submitForm(epoch))
+    # WEBSOCKET_API_URL = "ws://192.168.177.110:8001/webSocketHandler" 
 
-            real_data = data[0].to(device)
-            b_size = real_data.size(0)
-            
-            netD.zero_grad()
-            label = torch.full((b_size, ), real_label, device=device)
-            output = netD(real_data).view(-1)
-            errD_real = criterion(output.to(torch.float32), label.to(torch.float32))
-            errD_real.backward()
-            D_x = output.mean().item()
-            
-            noise = torch.randn(b_size, params['nz'], 1, 1, device=device)
-            fake_data = netG(noise)
-            label.fill_(fake_label)
-            output = netD(fake_data.detach()).view(-1)
-            errD_fake = criterion(output.to(torch.float32), label.to(torch.float32))
-            errD_fake.backward()
-            D_G_z1 = output.mean().item()
+    async with websockets.connect(WEBSOCKET_API_URL) as websocket:
+        try:
+            for epoch in range(params['nepochs']):
+                start_time = datetime.datetime.now()
 
-            errD = errD_real + errD_fake
-            optimizerD.step()
-            
-            netG.zero_grad()
-            label.fill_(real_label)
-            output = netD(fake_data).view(-1)
-            errG = criterion(output.to(torch.float32), label.to(torch.float32))
-            errG.backward()
-            D_G_z2 = output.mean().item()
-            optimizerG.step()
+                message_to_send = f"{params['nepochs']}:{epoch+1}:{23}"
+                await websocket.send(message_to_send)
+                print(f"전송됨: {message_to_send}")
 
-            # if i % 50 == 0:
-            # print(torch.cuda.is_available())
-            print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
-                % (epoch, params['nepochs'], i, len(dataloader),
-                    errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+                for i, data in enumerate(dataloader, 0):
 
-            G_losses.append(errG.item())
-            D_losses.append(errD.item())
+                    real_data = data[0].to(device)
+                    b_size = real_data.size(0)
+                    
+                    netD.zero_grad()
+                    label = torch.full((b_size, ), real_label, device=device)
+                    output = netD(real_data).view(-1)
+                    errD_real = criterion(output.to(torch.float32), label.to(torch.float32))
+                    errD_real.backward()
+                    D_x = output.mean().item()
+                    
+                    noise = torch.randn(b_size, params['nz'], 1, 1, device=device)
+                    fake_data = netG(noise)
+                    label.fill_(fake_label)
+                    output = netD(fake_data.detach()).view(-1)
+                    errD_fake = criterion(output.to(torch.float32), label.to(torch.float32))
+                    errD_fake.backward()
+                    D_G_z1 = output.mean().item()
 
-            if (iters % 100 == 0) or ((epoch == params['nepochs']-1) and (i == len(dataloader)-1)):
-                with torch.no_grad():
-                    fake_data = netG(fixed_noise).detach().cpu()
-                img_list.append(vutils.make_grid(fake_data, padding=2, normalize=True))
+                    errD = errD_real + errD_fake
+                    optimizerD.step()
+                    
+                    netG.zero_grad()
+                    label.fill_(real_label)
+                    output = netD(fake_data).view(-1)
+                    errG = criterion(output.to(torch.float32), label.to(torch.float32))
+                    errG.backward()
+                    D_G_z2 = output.mean().item()
+                    optimizerG.step()
 
-        if epoch == 0:
-            torch.save({
-                'generator': netG.state_dict(),
-                'discriminator': netD.state_dict(),
-                'optimizerG': optimizerG.state_dict(),
-                'optimizerD': optimizerD.state_dict(),
-                'params': params
-            }, output_dir+'/model/model_epoch_{0}.pth'.format(epoch))
+                    # if i % 50 == 0:
+                    # print(torch.cuda.is_available())
+                    print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+                        % (epoch, params['nepochs'], i, len(dataloader),
+                            errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
+
+                    G_losses.append(errG.item())
+                    D_losses.append(errD.item())
+
+                    if (iters % 100 == 0) or ((epoch == params['nepochs']-1) and (i == len(dataloader)-1)):
+                        with torch.no_grad():
+                            fake_data = netG(fixed_noise).detach().cpu()
+                        img_list.append(vutils.make_grid(fake_data, padding=2, normalize=True))
+
+                if epoch == 0:
+                    torch.save({
+                        'generator': netG.state_dict(),
+                        'discriminator': netD.state_dict(),
+                        'optimizerG': optimizerG.state_dict(),
+                        'optimizerD': optimizerD.state_dict(),
+                        'params': params
+                    }, output_dir+'/model/model_epoch_{0}.pth'.format(epoch))
+
+        except websockets.ConnectionClosed:
+            print("WebSocket 서버와의 연결이 닫혔습니다. 다시 연결 중...")
 
     from PIL import Image
     fig = plt.figure(figsize=(8,8))
@@ -169,32 +184,19 @@ async def train_dcgan(projectName) :
     plt.ylabel("Loss")
     plt.legend()
     plt.savefig(output_dir+'/fig/Training_loss.png', dpi=600)
-    plt.show()
+    # plt.show()
 
     fig = plt.figure(figsize=(8, 8))
     plt.axis("off")
     plt.title("Generated images per step")
     ims = [[plt.imshow(np.transpose(i, (1, 2, 0)), animated=True)] for i in img_list]
     anim = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
-    plt.show()
+    # plt.show()
     anim.save(output_dir+'/gif/X_ray.gif', dpi=80, writer='imagemagick')
 
 
-async def submitForm(message):
+# async def submitForm(message):
     # server_ip = "ws://192.168.170.110:8001/webSocketHandler"
-
-    uri = "ws://192.168.18.110:8001/webSocketHandler"  # 귀하의 Spring Boot WebSocket 서버 URL로 변경하세요.
-
-    async with websockets.connect(uri) as websocket:
-        try:
-            message_to_send = f"{message}"
-            await websocket.send(message_to_send)
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"전송됨: {message_to_send} : {current_time}")
-
-        except websockets.ConnectionClosed:
-            print("WebSocket 서버와의 연결이 닫혔습니다. 다시 연결 중...")
-
 
     # try:
     #     async with websockets.connect(server_ip) as websocket:
@@ -207,5 +209,5 @@ async def submitForm(message):
 
 
                 
-if __name__ == '__main__':
-    train_dcgan()
+# if __name__ == '__main__':
+#     train_dcgan()
