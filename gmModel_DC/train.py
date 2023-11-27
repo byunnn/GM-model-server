@@ -1,15 +1,16 @@
-import torch 
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.utils as vutils 
-import numpy as np 
-import matplotlib.pyplot as plt 
-import matplotlib.animation as animation 
-import random
-import os
-import websockets
 import asyncio
 import datetime
+import json
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import random
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision.utils as vutils
+import websockets
 from starlette.config import Config
 from gmModel_DC.utils import get_data 
 from gmModel_DC.dcgan import weights_init, Generator, Discriminator 
@@ -35,7 +36,7 @@ async def train_dcgan(projectName) :
         'nz': 100,
         'ngf': 64,
         'ndf': 64,
-        'nepochs': 1,
+        'nepochs': 2,
         'lr': 0.0002,
         'beta1': 0.5,
         'save_epoch': 10
@@ -47,15 +48,15 @@ async def train_dcgan(projectName) :
     dataloader = get_data(params)
 
     sample_batch = next(iter(dataloader))
-    # plt.figure(figsize=(8, 8))
-    # plt.axis("off")
-    # plt.title("Training Images")
-    # plt.imshow(np.transpose(vutils.make_grid(
-    #     sample_batch[0].to(device)[:64], padding=2, normalize=True).cpu(), (1, 2, 0)))
+    plt.figure(figsize=(8, 8))
+    plt.axis("off")
+    plt.title("Training Images")
+    plt.imshow(np.transpose(vutils.make_grid(
+        sample_batch[0].to(device)[:64], padding=2, normalize=True).cpu(), (1, 2, 0)))
+    plt.savefig(output_dir+'/fig/user_dataset.png', dpi=600)
     # plt.show()
 
     
-
     netG = Generator(params).to(device)
     netG.apply(weights_init)
     print(netG)
@@ -82,18 +83,19 @@ async def train_dcgan(projectName) :
 
     print("Starting Training Loop...")
 
-    config = Config(".env")
-    SERVER_IP = config('API_BASE_URL')
-    WEBSOCKET_API_URL = f"ws://{SERVER_IP}/webSocketHandler"
+    # config = Config(".env")
+    # IP = config('API_BASE_URL')
+    # WEBSOCKET_API_URL = f"ws://{IP}/webSocketHandler"
 
-    # WEBSOCKET_API_URL = "ws://192.168.177.110:8001/webSocketHandler" 
+    WEBSOCKET_API_URL = "ws://192.168.177.110:8001/webSocketHandler" 
 
     async with websockets.connect(WEBSOCKET_API_URL) as websocket:
+        epoch_time = 0
         try:
             for epoch in range(params['nepochs']):
-                start_time = datetime.datetime.now()
+                epoch_start_time = datetime.datetime.now()
 
-                message_to_send = f"{params['nepochs']}:{epoch+1}:{23}"
+                message_to_send = f"{params['nepochs']}:{epoch+1}:{epoch_time}"
                 await websocket.send(message_to_send)
                 print(f"전송됨: {message_to_send}")
 
@@ -151,6 +153,19 @@ async def train_dcgan(projectName) :
                         'params': params
                     }, output_dir+'/model/model_epoch_{0}.pth'.format(epoch))
 
+                # 각 epoch 종료 시간 기록
+                epoch_end_time = datetime.datetime.now()
+
+                one_epoch_time = epoch_end_time - epoch_start_time
+                epoch_time_seconds = one_epoch_time.total_seconds()
+
+                # Convert seconds to minutes and keep only two decimal places
+                epoch_time = round(epoch_time_seconds / 60, 1)
+                # epoch_time = one_epoch_time.total_seconds() / 60
+                print(f"one_epoch_time: {one_epoch_time}")
+                print(f"epoch_time: {epoch_time}")
+
+
         except websockets.ConnectionClosed:
             print("WebSocket 서버와의 연결이 닫혔습니다. 다시 연결 중...")
 
@@ -193,20 +208,6 @@ async def train_dcgan(projectName) :
     anim = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
     # plt.show()
     anim.save(output_dir+'/gif/X_ray.gif', dpi=80, writer='imagemagick')
-
-
-# async def submitForm(message):
-    # server_ip = "ws://192.168.170.110:8001/webSocketHandler"
-
-    # try:
-    #     async with websockets.connect(server_ip) as websocket:
-    #         await websocket.send(f"{total} 중 {now}번째 실행 중")
-    #         websocket.close()
-    # except Exception as e:
-    #     print(f"WebSocket 연결 중 오류 발생: {e}")
-
-
-
 
                 
 # if __name__ == '__main__':
