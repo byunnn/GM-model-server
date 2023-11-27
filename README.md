@@ -23,14 +23,18 @@ To get started with GM-model-server, follow these steps:
    ```
 
 2. **Install Dependencies**:
-  ```bash
-  pip install -r requirements.txt
-  ```
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 
 3. **Run the Server**:
-  ```bash
-  uvicorn main:app --reload --port your_port_number 
-  ```
+     ```bash
+     uvicorn main:app --reload --port your_port_number 
+     ```
 
 ## Configuration
 Adjust the server configuration in the .env file.
+
+## API Documentation
+For detailed API documentation, refer to the Swagger documentation provided by FastAPI. Access it at http://127.0.0.1:8000/docs after running the server.
