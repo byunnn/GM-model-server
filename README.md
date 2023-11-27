@@ -30,7 +30,7 @@ To get started with GM-model-server, follow these steps:
 
 3. **Run the Server**:
      ```bash
-     uvicorn main:app --reload --port your_port_number 
+     uvicorn main:app --reload --port=your_port_number --host=0.0.0.0
      ```
 
 ## Configuration
