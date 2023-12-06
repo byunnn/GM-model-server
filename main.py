@@ -1,9 +1,10 @@
 from fastapi import FastAPI, File
 import os
-from starlette.config import Config
-import requests
-from zipfile import ZipFile
 from pydantic import BaseModel
+import requests
+from starlette.config import Config
+from zipfile import ZipFile
+
 from gmModel_DC.generate import generate_dcgan
 from gmModel_DC.train import train_dcgan
 from generate_fmnist import generate_fmnist
@@ -37,10 +38,14 @@ async def download_and_extract(item: File):
     zipUrl = item.zipUrl
     print( projectName, email  , zipUrl)
 
-    target_dir = 'user_dataset'
+    target_dir = 'user_dataset/'+projectName
+    target_dir2 = 'gmModel_DC/user_dataset/'+projectName
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
+
+    if not os.path.exists(target_dir2):
+        os.makedirs(target_dir2)
 
     # HTTP GET 요청을 보내 파일 다운로드
     response = requests.get(item.zipUrl)
@@ -48,7 +53,9 @@ async def download_and_extract(item: File):
         raise Exception("Can't download a file.")
     
 
-    file_path = os.path.join(target_dir, 'generated_images.zip')
+    file_path = os.path.join(target_dir, projectName+'_dataset.zip')
+    file_path2 = os.path.join(target_dir2, projectName+'_dataset.zip')
+
     # 파일 저장
     with open(file_path, "wb") as f:
         f.write(response.content)
@@ -57,14 +64,47 @@ async def download_and_extract(item: File):
     with ZipFile(file_path, "r") as zip_ref:
         zip_ref.extractall(target_dir)
 
+    #다운받은 zip 파일 삭제
+    os.remove(file_path)
+
+    # 파일 저장
+    with open(file_path2, "wb") as f:
+        f.write(response.content)
+
+    # 압축 해제
+    with ZipFile(file_path2, "r") as zip_ref:
+        zip_ref.extractall(target_dir2)
+
+    #다운받은 zip 파일 삭제
+    os.remove(file_path2)
+
+    # 압축 해제 후 target_dir 내의 모든 파일과 디렉토리 출력
+    print(f"Files and directories in {target_dir}:")
+    for root, dirs, files in os.walk(target_dir):
+        for directory in dirs:
+            print("dirs : ", os.path.join(root, directory))
+        for file in files:
+            print("files : ", os.path.join(root, file))
+
     await train_dcgan(projectName)
     await generate_images(projectName, email)
+
+
+async def get_metrics(projectName, email):
+    accuracy = 1
+    fid = 1
+    lpips = 1
+
+    #흉부 데이터 covid normal
+    #원본 데이터(covid, normal)
+    #생성 데이터()
 
 
 #이미지 생성 + zip 파일로 압축
 async def generate_images(projectName, email):
     try:
         await generate_dcgan(projectName)
+
 
         output_dir = 'gmModel_DC/outputs/'+projectName
         zip_file_path = os.path.join(output_dir, projectName+'.zip')
@@ -85,10 +125,24 @@ async def generate_images(projectName, email):
     return {"message": "done", "zip_filename": zip_file_path}
 
 
-async def get_metrics(projectName, email):
-    accuracy = 1
-    fid = 1
-    lpips = 1
+
+    # def calculate_fid_given_paths(paths, img_size=256, batch_size=50):
+#     print('Calculating FID given paths %s and %s...' % (paths[0], paths[1]))
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     inception = InceptionV3().eval().to(device)
+#     loaders = [get_eval_loader(path, img_size, batch_size) for path in paths]
+
+#     mu, cov = [], []
+#     for loader in loaders:
+#         actvs = []
+#         for x in tqdm(loader, total=len(loader)):
+#             actv = inception(x.to(device))
+#             actvs.append(actv)
+#         actvs = torch.cat(actvs, dim=0).cpu().detach().numpy()
+#         mu.append(np.mean(actvs, axis=0))
+#         cov.append(np.cov(actvs, rowvar=False))
+#     fid_value = frechet_distance(mu[0], cov[0], mu[1], cov[1])
+#     return fid_value
 
 #loss, generated_gif
 async def send_zip_fun(projectName, email):

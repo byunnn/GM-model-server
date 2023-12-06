@@ -119,6 +119,7 @@ pytest-runner==6.0.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 python-multipart==0.0.6
+pytorch-fid==0.3.0
 pytz==2023.3.post1
 PyWavelets==1.4.1
 pywin32==306

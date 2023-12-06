@@ -8,3 +8,8 @@ gmModel_DC/data/Normal/*.png
 gmModel_DC/generated_images/*.png
 GM-model-server/images/*.png
 generated_images/*.png
+CNN_clasification/data/train/Normal/*.png
+CNN_clasification/data/train/COVID/*.png
+CNN_clasification/data/test/Normal/*.png
+CNN_clasification/data/test/COVID/*.png
+gmModel_DC/data.zip
